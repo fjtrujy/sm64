@@ -158,12 +158,13 @@ static inline bool memcard_check(void) {
 bool ps2_memcard_init(void) {
     int ret = -1;
     ret = init_memcard_driver(true);
-    if(ret != 1) {
+    if(ret < 0) {
         printf("ps2_memcard: failed to init memcard driver: %d\n", ret);
         return false;
     }
 
     ret = mcInit(MC_TYPE_XMC);
+    if (ret < 0) ret = mcInit(MC_TYPE_MC);
     if (ret < 0) {
         printf("ps2_memcard: mcInit failed: %d\n", ret);
         return false;
