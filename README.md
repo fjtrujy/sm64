@@ -22,11 +22,11 @@ cd sm64-port
 3. Build Docker image: `docker build . -t sm64_ps2`
 4. Compile using your Docker image: `docker run --rm -ti -v $(pwd):/sm64 sm64_ps2 make --jobs 4`
 
-### Manually under Linux (WSL not tested, MSYS2 probably won't work)
+### Manually under Linux (WSL can work, MSYS2 probably won't work)
 
 0. Ensure Git, GCC, GNU Make and Python 3 are installed on your system:
 ```
-# for example on Ubuntu
+# for example on Debian or Debian based distros (Ubuntu, Pop!_OS and others)
 sudo apt install git build-essential python3
 ```
 1. Ensure PS2SDK and GSKit are installed on your system and the environmental variables `PS2SDK` and `GSKIT` are defined and PS2SDK is in your `PATH`.
