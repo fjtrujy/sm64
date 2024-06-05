@@ -42,6 +42,7 @@
 # include <sifrpc.h>
 # include <loadfile.h>
 # include <sbv_patches.h>
+# include <ps2_filesystem_driver.h>
 # include "ps2_memcard.h"
 #endif
 

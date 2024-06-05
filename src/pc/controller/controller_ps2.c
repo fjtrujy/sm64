@@ -5,6 +5,7 @@
 #include <kernel.h>
 #include <ps2_joystick_driver.h>
 #include <libpad.h>
+#include <libmtap.h>
 
 #include "controller_api.h"
 
