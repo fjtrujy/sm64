@@ -483,8 +483,8 @@ ifeq ($(TARGET_PS2),1)
   PS2_ICON   := ps2/sm64.icn
   C_FILES += $(BUILD_DIR)/ps2_icon.c
   O_FILES += $(BUILD_DIR)/ps2_icon.o
-  PLATFORM_CFLAGS  := -DTARGET_PS2 -D_EE -G0 -I$(PS2SDK)/ee/include -I$(PS2SDK)/common/include -I$(PS2SDK)/ports/include -I$(GSKIT)/include
-  PLATFORM_LDFLAGS := -Wl,-zmax-page-size=128 -T$(PS2SDK)/ee/startup/linkfile -L$(GSKIT)/lib -L$(PS2SDK)/ee/lib -L$(PS2SDK)/ports/lib -lgskit -ldmakit -lps2_drivers -lmc -lpatches
+  PLATFORM_CFLAGS  := -DTARGET_PS2 -D_EE -G0 -I$(PS2SDK)/ee/include -I$(PS2SDK)/common/include -I$(PS2SDK)/ports/include -I$(PS2DEV)/gskit/include
+  PLATFORM_LDFLAGS := -Wl,-zmax-page-size=128 -T$(PS2SDK)/ee/startup/linkfile -L$(PS2DEV)/gskit/lib -L$(PS2SDK)/ee/lib -L$(PS2SDK)/ports/lib -lgskit -ldmakit -lps2_drivers -lmc -lpatches
 endif
 
 PLATFORM_CFLAGS += -DNO_SEGMENTED_MEMORY

@@ -29,14 +29,13 @@ cd sm64-port
 # for example on Debian or Debian based distros (Ubuntu, Pop!_OS and others)
 sudo apt install git build-essential python3
 ```
-1. Ensure PS2SDK and GSKit are installed on your system and the environmental variables `PS2SDK` and `GSKIT` are defined and PS2SDK is in your `PATH`.
+1. Ensure PS2DEV toolchain are installed on your system and the environmental variables `PS2DEV` and `PS2SDK` are defined is in your `PATH`.
 You can follow the installation instructions in the [ps2dev repo](https://github.com/ps2dev/ps2dev), or you can get the latest stable binaries and use them:
 ```
 wget https://github.com/ps2dev/ps2dev/releases/download/latest/ps2dev-ubuntu-latest.tar.gz
 tar xvzf ps2dev-ubuntu-latest.tar.gz
 export PATH="$(pwd)/ps2dev/ee/bin:$(pwd)/ps2dev/iop/bin:$(pwd)/sm64-port/tools:${PATH}"
 export PS2SDK=$(pwd)/ps2dev/ps2sdk
-export GSKIT=$(pwd)/ps2dev/gsKit
 ```
 2. Check out repo, submodules, etc:
 ```
@@ -64,6 +63,10 @@ Remember that packed ELFs will take a while to unpack before starting.
 3. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`.
 4. Run `make` to build. Qualify the version through `make VERSION=<VERSION>`. Add `-j4` to improve build speed (hardware dependent based on the amount of CPU cores available).
 5. The executable binary will be located at `build/<VERSION>_pc/sm64.<VERSION>.f3dex2e`.
+
+### MacOS
+
+Same steps as Linux, however, be sure you use the `gnu make`, run `brew install make` and then, update your `PATH` variable with `export PATH="$(brew --prefix make)/libexec/gnubin:$PATH"`
 
 ### Windows
 
