@@ -9,11 +9,16 @@
 
 #ifdef TARGET_PS2
 #include "ps2_memcard.h"
+#include <timer.h>
 #endif
 
 extern OSMgrArgs piMgrArgs;
 
 u64 osClockRate = 62500000;
+u64 osCounterRate = 46875000;
+
+#define OS_COUNTER_NUM (osCounterRate / 1000ULL)
+#define OS_COUNTER_DEN (1000000ULL / 1000ULL)
 
 s32 osPiStartDma(UNUSED OSIoMesg *mb, UNUSED s32 priority, UNUSED s32 direction,
                  uintptr_t devAddr, void *vAddr, size_t nbytes,
@@ -79,7 +84,8 @@ void osViSwapBuffer(UNUSED void *vaddr) {
 }
 
 OSTime osGetTime(void) {
-    return 0;
+    u64 sysGetMicroseconds = GetTimerSystemTime() / (kBUSCLK / (1000 * 1000));
+    return (sysGetMicroseconds * OS_COUNTER_NUM) / OS_COUNTER_DEN;
 }
 
 void osWritebackDCacheAll(void) {
@@ -92,8 +98,7 @@ void osInvalDCache(UNUSED void *a, UNUSED size_t b) {
 }
 
 u32 osGetCount(void) {
-    static u32 counter;
-    return counter++;
+    return (u32)osGetTime();
 }
 
 s32 osAiSetFrequency(u32 freq) {
