@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _ME_LIB_H_
+#define _ME_LIB_H_
 
 #ifdef __cplusplus  
 extern "C" {
@@ -63,8 +64,10 @@ void J_Update(float cpuTime); /** Dispatches and runs jobs on this thread. See a
 float J_GetMETime();
 float J_GetCPUTime();
 
-struct me_struct* mei;
+extern struct me_struct* mei;
 
 #ifdef __cplusplus  
 }
 #endif 
+
+#endif /* _ME_LIB_H_ */

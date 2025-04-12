@@ -44,7 +44,6 @@
 #endif
 
 PSP_MODULE_INFO(MODULE_NAME, 0, 1, 1);
-PSP_HEAP_SIZE_MAX();
 PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER | THREAD_ATTR_VFPU);
 
 const char _srcver[] __attribute__((section (".version"), used)) = MODULE_NAME " - " SRC_VER ;

@@ -810,10 +810,10 @@ $(SOUND_BIN_DIR)/bank_sets: $(SOUND_BIN_DIR)/sequences.bin
 	@true
 
 $(SOUND_BIN_DIR)/%.m64: $(SOUND_BIN_DIR)/%.o
-	$(HOST_OBJCOPY) -j .rodata $< -O binary $@
+	$(OBJCOPY) -j .rodata $< -O binary $@
 
 $(SOUND_BIN_DIR)/%.o: $(SOUND_BIN_DIR)/%.s
-	$(HOST_AS) $(ASFLAGS) -o $@ $< -Z  2> /dev/null
+	$(AS) $(ASFLAGS) -o $@ $< -Z  2> /dev/null
 
 $(SOUND_BIN_DIR)/%.inc.c: $(SOUND_BIN_DIR)/%
 	$(HEXDUMP) -v -e '1/1 "0x%X,"' $< > $@
@@ -906,7 +906,7 @@ $(BUILD_DIR)/%.o: $(BUILD_DIR)/%.c
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 $(BUILD_DIR)/%.o: %.s
-	$(HOST_AS) $(ASFLAGS) -MD $(BUILD_DIR)/$*.d -o $@ $<
+	$(AS) $(ASFLAGS) -MD $(BUILD_DIR)/$*.d -o $@ $<
 
 ifeq ($(TARGET_N64),1)
 $(BUILD_DIR)/$(LD_SCRIPT): $(LD_SCRIPT)

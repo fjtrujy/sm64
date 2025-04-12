@@ -257,7 +257,7 @@ static inline uint32_t get_shader_index(uint32_t id) {
         }
     }
     char msg[32];
-    sprintf(msg, "ERROR! Shader not known %u\n", id);
+    sprintf(msg, "ERROR! Shader not known %lu\n", id);
     sceIoWrite(2, msg, strlen(msg));
     return 0;
 }
@@ -459,7 +459,7 @@ static void gfx_scegu_shader_get_info(struct ShaderProgram *prg, uint8_t *num_in
     used_textures[1] = prg->texture_used[1];
 }
 
-static unsigned int gfx_scegu_new_texture(void) {
+static uint32_t gfx_scegu_new_texture(void) {
     return texman_create();
 }
 
@@ -504,7 +504,7 @@ static void gfx_scegu_set_sampler_parameters(const int tile, const bool linear_f
         gfx_scegu_apply_tmu_state(tile);
 }
 
-static void gfx_scegu_select_texture(int tile, unsigned int texture_id) {
+static void gfx_scegu_select_texture(int tile, uint32_t texture_id) {
     if (tmu_state[tile].tex != texture_id) {
         tmu_state[tile].tex = texture_id;
         texman_bind_tex(texture_id);
