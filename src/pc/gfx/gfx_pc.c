@@ -15,7 +15,6 @@
 #include <pspgu.h>
 #include <pspgum.h>
 #include <pspkernel.h>
-#include "pspmath.h"
 
 #include "gfx_pc.h"
 #include "gfx_cc.h"
