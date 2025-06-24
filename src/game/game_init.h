@@ -9,7 +9,7 @@
 #include "types.h"
 #include "memory.h"
 
-#define GFX_POOL_SIZE 6400
+#define GFX_POOL_SIZE 6800
 
 struct GfxPool {
     Gfx buffer[GFX_POOL_SIZE];
@@ -32,8 +32,10 @@ extern OSMesgQueue D_80339CB8;
 extern OSMesg D_80339CD0;
 extern OSMesg D_80339CD4;
 extern struct VblankHandler gGameVblankHandler;
+#if !(defined(TARGET_DC) || defined(TARGET_PSP))
 extern uintptr_t gPhysicalFrameBuffers[3];
 extern uintptr_t gPhysicalZBuffer;
+#endif
 extern void *D_80339CF0;
 extern void *D_80339CF4;
 extern struct SPTask *gGfxSPTask;

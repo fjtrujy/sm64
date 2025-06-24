@@ -192,6 +192,7 @@ f32 get_water_level_below_shadow(struct Shadow *s) {
     }
     //! @bug Missing return statement. This compiles to return `waterLevel`
     //! incidentally.
+    return waterLevel;
 }
 
 /**
@@ -203,7 +204,7 @@ f32 get_water_level_below_shadow(struct Shadow *s) {
  *                          be dimmed based on its distance to the floor
  */
 s8 init_shadow(struct Shadow *s, f32 xPos, f32 yPos, f32 zPos, s16 shadowScale, u8 overwriteSolidity) {
-    f32 waterLevel;
+    f32 waterLevel = 0.f;
     f32 floorSteepness;
     struct FloorGeometry *floorGeometry;
 
@@ -260,24 +261,24 @@ s8 init_shadow(struct Shadow *s, f32 xPos, f32 yPos, f32 zPos, s16 shadowScale, 
 /**
  * Given a `vertexNum` from a shadow with nine vertices, update the
  * texture coordinates corresponding to that vertex. That is:
- *      0 = (-15, -15)         1 = (0, -15)         2 = (15, -15)
- *      3 = (-15,   0)         4 = (0,   0)         5 = (15,   0)
- *      6 = (-15,  15)         7 = (0,  15)         8 = (15,  15)
+ *      0 = (0,   0)         1 = (7,   0)         2 = (15,   0)
+ *      3 = (0,   7)         4 = (7,   7)         5 = (15,   7)
+ *      6 = (0,  15)         7 = (7,  15)         8 = (15,  15)
  */
 void get_texture_coords_9_vertices(s8 vertexNum, s16 *textureX, s16 *textureY) {
-    *textureX = vertexNum % 3 * 15 - 15;
-    *textureY = vertexNum / 3 * 15 - 15;
+    *textureX = (vertexNum % 3) * 8 - !((vertexNum % 3) == 0);
+    *textureY = (vertexNum / 3) * 8 - !((vertexNum / 3) == 0);
 }
 
 /**
  * Given a `vertexNum` from a shadow with four vertices, update the
  * texture coordinates corresponding to that vertex. That is:
- *      0 = (-15, -15)         1 = (15, -15)
- *      2 = (-15,  15)         3 = (15,  15)
+ *      0 = (0,   0)         1 = (15,   0)
+ *      2 = (0,  15)         3 = (15,  15)
  */
 void get_texture_coords_4_vertices(s8 vertexNum, s16 *textureX, s16 *textureY) {
-    *textureX = (vertexNum % 2) * 2 * 15 - 15;
-    *textureY = (vertexNum / 2) * 2 * 15 - 15;
+    *textureX = (vertexNum % 2) * 15;
+    *textureY = (vertexNum / 2) * 15;
 }
 
 /**
@@ -294,7 +295,7 @@ void make_shadow_vertex_at_xyz(Vtx *vertices, s8 index, f32 relX, f32 relY, f32 
     s16 vtxX = round_float(relX);
     s16 vtxY = round_float(relY);
     s16 vtxZ = round_float(relZ);
-    s16 textureX, textureY;
+    s16 textureX = 0, textureY = 0;
 
     switch (shadowVertexType) {
         case SHADOW_WITH_9_VERTS:
@@ -523,27 +524,10 @@ void linearly_interpolate_solidity_negative(struct Shadow *s, u8 initialSolidity
 /**
  * Change a shadow's solidity based on the player's current animation frame.
  */
-s8 correct_shadow_solidity_for_animations(s32 isLuigi, u8 initialSolidity, struct Shadow *shadow) {
-    struct Object *player;
+s8 correct_shadow_solidity_for_animations(u8 initialSolidity, struct Shadow *shadow) {
+    struct Object *player = gMarioObject;
     s8 ret;
     s16 animFrame;
-
-    switch (isLuigi) {
-        case 0:
-            player = gMarioObject;
-            break;
-        case 1:
-            /**
-             * This is evidence of a removed second player, likely Luigi.
-             * This variable lies in memory just after the gMarioObject and
-             * has the same type of shadow that Mario does. The `isLuigi`
-             * variable is never 1 in the game. Note that since this was a
-             * switch-case, not an if-statement, the programmers possibly
-             * intended there to be even more than 2 characters.
-             */
-            player = gLuigiObject;
-            break;
-    }
 
     animFrame = player->header.gfx.unk38.animFrame;
     switch (player->header.gfx.unk38.animID) {
@@ -592,11 +576,11 @@ void correct_lava_shadow_height(struct Shadow *s) {
  * Create a shadow under a player, correcting that shadow's opacity during
  * appropriate animations and other states.
  */
-Gfx *create_shadow_player(f32 xPos, f32 yPos, f32 zPos, s16 shadowScale, u8 solidity, s32 isLuigi) {
+Gfx *create_shadow_player(f32 xPos, f32 yPos, f32 zPos, s16 shadowScale, u8 solidity) {
     Vtx *verts;
     Gfx *displayList;
     struct Shadow shadow;
-    s8 ret;
+    s8 ret = 0;
     s32 i;
 
     // Update global variables about whether Mario is on a flying carpet.
@@ -612,7 +596,7 @@ Gfx *create_shadow_player(f32 xPos, f32 yPos, f32 zPos, s16 shadowScale, u8 soli
         }
     }
 
-    switch (correct_shadow_solidity_for_animations(isLuigi, solidity, &shadow)) {
+    switch (correct_shadow_solidity_for_animations(solidity, &shadow)) {
         case SHADOW_SOLIDITY_NO_SHADOW:
             return NULL;
             break;
@@ -890,8 +874,7 @@ Gfx *create_shadow_below_xyz(f32 xPos, f32 yPos, f32 zPos, s16 shadowScale, u8 s
                 create_shadow_square(xPos, yPos, zPos, shadowScale, shadowSolidity, shadowType);
             break;
         case SHADOW_CIRCLE_PLAYER:
-            displayList = create_shadow_player(xPos, yPos, zPos, shadowScale, shadowSolidity,
-                                               /* isLuigi */ FALSE);
+            displayList = create_shadow_player(xPos, yPos, zPos, shadowScale, shadowSolidity);
             break;
         default:
             displayList = create_shadow_hardcoded_rectangle(xPos, yPos, zPos, shadowScale,

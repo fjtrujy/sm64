@@ -37,8 +37,10 @@ OSMesgQueue D_80339CB8;
 OSMesg D_80339CD0;
 OSMesg D_80339CD4;
 struct VblankHandler gGameVblankHandler;
+#if !(defined(TARGET_DC) || defined(TARGET_PSP))
 uintptr_t gPhysicalFrameBuffers[3];
 uintptr_t gPhysicalZBuffer;
+#endif
 void *D_80339CF0;
 void *D_80339CF4;
 struct MarioAnimation D_80339D10;
@@ -58,6 +60,94 @@ struct Controller *gPlayer3Controller = &gControllers[2];
 struct DemoInput *gCurrDemoInput = NULL; // demo input sequence
 u16 gDemoInputListID = 0;
 struct DemoInput gRecordedDemoInput = { 0 }; // possibly removed in EU. TODO: Check
+
+#if defined(TARGET_PSP)
+#define SECONDS_PER_CYCLE (1.0f/1000000.0f) /* psp tick rate obtained from sceRtcGetTickResolution() */
+#elif defined(TARGET_DC)
+#define SECONDS_PER_CYCLE (1.0f/1000000.0f) /* Figure this out for dc */
+#else
+// SDK states that 1 cycle takes about 21.33 nanoseconds
+#define SECONDS_PER_CYCLE 0.00000002133f
+#endif
+
+#define FPS_COUNTER_X_POS 24
+#define FPS_COUNTER_Y_POS 190
+
+static OSTime gLastOSTime = 0;
+static float gFrameTime = 0.0f;
+static u16 gFrames = 0;
+u16 gFPS = 0;
+int gProcessAudio = TRUE;
+int gDoDither = FALSE;
+int gDoAA = FALSE;
+static u8 gRenderFPS = FALSE;
+
+static void calculate_frameTime_from_OSTime(OSTime diff) {
+    gFrameTime += diff * SECONDS_PER_CYCLE;
+    gFrames++;
+}
+
+static void render_fps(void) {
+#if defined(TARGET_PSP)
+    extern int mediaengine_available;
+    extern int volatile mediaengine_sound;
+#endif
+
+    // Toggle rendering framerate with the L button.
+    if ((gPlayer1Controller->buttonPressed & R_TRIG) && (gPlayer1Controller->buttonPressed & L_TRIG)) {
+        gRenderFPS ^= 1;
+    }
+
+    if ((gPlayer1Controller->buttonPressed & R_TRIG) && (gPlayer1Controller->buttonPressed & B_BUTTON)) {
+        gProcessAudio ^= 1;
+#if defined(TARGET_PSP)
+        if(mediaengine_available){
+            mediaengine_sound ^= 1;
+        }
+#endif
+    }
+
+    if ((gPlayer1Controller->buttonPressed & R_TRIG) && (gPlayer1Controller->buttonPressed & Z_TRIG)) {
+        gDoDither ^= 1;
+#if defined(TARGET_PSP)
+        extern void init_mediaengine(void);
+        extern void kill_audiomanager(void);
+        extern void init_audiomanager(void);
+        extern volatile s32 gAudioFrameCount;
+        extern s32 sGameLoopTicked;
+        gAudioFrameCount++;
+        if (sGameLoopTicked != 0) {
+            sGameLoopTicked = 0;
+        }
+        gAudioFrameCount++;
+        if (sGameLoopTicked != 0) {
+            sGameLoopTicked = 0;
+        }
+        kill_audiomanager();
+        init_mediaengine();
+        init_audiomanager();
+#endif
+    }
+
+    if ((gPlayer1Controller->buttonPressed & L_TRIG)) {
+        gDoAA ^= 1;
+    }
+
+    OSTime newTime = osGetTime();
+    calculate_frameTime_from_OSTime(newTime - gLastOSTime);
+
+    // If frame time is longer or equal to a second, update FPS counter.
+    if (gFrameTime >= 1.0f) {
+        gFPS = gFrames;
+        gFrames = 0;
+        gFrameTime = 0.0f;
+    }
+    gLastOSTime = newTime;
+
+    if (gRenderFPS) {
+        print_text_fmt_int(FPS_COUNTER_X_POS, FPS_COUNTER_Y_POS, "FPS %d", gFPS);
+    }
+}
 
 /**
  * Initializes the Reality Display Processor (RDP).
@@ -116,6 +206,7 @@ void my_rsp_init(void) {
 
 /** Clear the Z buffer. */
 void clear_z_buffer(void) {
+#if defined(TARGET_N64)
     gDPPipeSync(gDisplayListHead++);
 
     gDPSetDepthSource(gDisplayListHead++, G_ZS_PIXEL);
@@ -127,10 +218,12 @@ void clear_z_buffer(void) {
 
     gDPFillRectangle(gDisplayListHead++, 0, BORDER_HEIGHT, SCREEN_WIDTH - 1,
                      SCREEN_HEIGHT - 1 - BORDER_HEIGHT);
+#endif
 }
 
 /** Sets up the final framebuffer image. */
 void display_frame_buffer(void) {
+#if defined(TARGET_N64)
     gDPPipeSync(gDisplayListHead++);
 
     gDPSetCycleType(gDisplayListHead++, G_CYC_1CYCLE);
@@ -138,10 +231,12 @@ void display_frame_buffer(void) {
                      gPhysicalFrameBuffers[frameBufferIndex]);
     gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
                   SCREEN_HEIGHT - BORDER_HEIGHT);
+#endif
 }
 
 /** Clears the framebuffer, allowing it to be overwritten. */
 void clear_frame_buffer(s32 color) {
+#if defined(TARGET_N64)
     gDPPipeSync(gDisplayListHead++);
 
     gDPSetRenderMode(gDisplayListHead++, G_RM_OPA_SURF, G_RM_OPA_SURF2);
@@ -155,10 +250,14 @@ void clear_frame_buffer(s32 color) {
     gDPPipeSync(gDisplayListHead++);
 
     gDPSetCycleType(gDisplayListHead++, G_CYC_1CYCLE);
+#else
+    (void)color;
+#endif
 }
 
 /** Clears and initializes the viewport. */
 void clear_viewport(Vp *viewport, s32 color) {
+#if defined(TARGET_N64)
     s16 vpUlx = (viewport->vp.vtrans[0] - viewport->vp.vscale[0]) / 4 + 1;
     s16 vpUly = (viewport->vp.vtrans[1] - viewport->vp.vscale[1]) / 4 + 1;
     s16 vpLrx = (viewport->vp.vtrans[0] + viewport->vp.vscale[0]) / 4 - 2;
@@ -180,6 +279,10 @@ void clear_viewport(Vp *viewport, s32 color) {
     gDPPipeSync(gDisplayListHead++);
 
     gDPSetCycleType(gDisplayListHead++, G_CYC_1CYCLE);
+#else
+    (void)viewport;
+    (void)color;
+#endif
 }
 
 /** Draws the horizontal screen borders */
@@ -264,6 +367,7 @@ void end_master_display_list(void) {
 }
 
 void draw_reset_bars(void) {
+#if !(defined(TARGET_DC) || defined(TARGET_PSP))
     s32 sp24;
     s32 sp20;
     s32 fbNum;
@@ -289,6 +393,7 @@ void draw_reset_bars(void) {
     osWritebackDCacheAll();
     osRecvMesg(&gGameVblankQueue, &D_80339BEC, OS_MESG_BLOCK);
     osRecvMesg(&gGameVblankQueue, &D_80339BEC, OS_MESG_BLOCK);
+#endif
 }
 
 void rendering_init(void) {
@@ -325,7 +430,9 @@ void display_and_vsync(void) {
     send_display_list(&gGfxPool->spTask);
     profiler_log_thread5_time(AFTER_DISPLAY_LISTS);
     osRecvMesg(&gGameVblankQueue, &D_80339BEC, OS_MESG_BLOCK);
+#if !(defined(TARGET_DC) || defined(TARGET_PSP))
     osViSwapBuffer((void *) PHYSICAL_TO_VIRTUAL(gPhysicalFrameBuffers[sCurrFBNum]));
+#endif
     profiler_log_thread5_time(THREAD5_END);
     osRecvMesg(&gGameVblankQueue, &D_80339BEC, OS_MESG_BLOCK);
     if (++sCurrFBNum == 3) {
@@ -335,39 +442,6 @@ void display_and_vsync(void) {
         frameBufferIndex = 0;
     }
     gGlobalTimer++;
-}
-
-// this function records distinct inputs over a 255-frame interval to RAM locations and was likely
-// used to record the demo sequences seen in the final game. This function is unused.
-static void record_demo(void) {
-    // record the player's button mask and current rawStickX and rawStickY.
-    u8 buttonMask =
-        ((gPlayer1Controller->buttonDown & (A_BUTTON | B_BUTTON | Z_TRIG | START_BUTTON)) >> 8)
-        | (gPlayer1Controller->buttonDown & (U_CBUTTONS | D_CBUTTONS | L_CBUTTONS | R_CBUTTONS));
-    s8 rawStickX = gPlayer1Controller->rawStickX;
-    s8 rawStickY = gPlayer1Controller->rawStickY;
-
-    // if the stick is in deadzone, set its value to 0 to
-    // nullify the effects. We do not record deadzone inputs.
-    if (rawStickX > -8 && rawStickX < 8) {
-        rawStickX = 0;
-    }
-
-    if (rawStickY > -8 && rawStickY < 8) {
-        rawStickY = 0;
-    }
-
-    // record the distinct input and timer so long as they
-    // are unique. If the timer hits 0xFF, reset the timer
-    // for the next demo input.
-    if (gRecordedDemoInput.timer == 0xFF || buttonMask != gRecordedDemoInput.buttonMask
-        || rawStickX != gRecordedDemoInput.rawStickX || rawStickY != gRecordedDemoInput.rawStickY) {
-        gRecordedDemoInput.timer = 0;
-        gRecordedDemoInput.buttonMask = buttonMask;
-        gRecordedDemoInput.rawStickX = rawStickX;
-        gRecordedDemoInput.rawStickY = rawStickY;
-    }
-    gRecordedDemoInput.timer++;
 }
 
 // take the updated controller struct and calculate
@@ -567,10 +641,12 @@ void setup_game_memory(void) {
     set_segment_base_addr(0, (void *) 0x80000000);
     osCreateMesgQueue(&D_80339CB8, &D_80339CD4, 1);
     osCreateMesgQueue(&gGameVblankQueue, &D_80339CD0, 1);
+#if !(defined(TARGET_DC) || defined(TARGET_PSP))
     gPhysicalZBuffer = VIRTUAL_TO_PHYSICAL(gZBuffer);
     gPhysicalFrameBuffers[0] = VIRTUAL_TO_PHYSICAL(gFrameBuffer0);
     gPhysicalFrameBuffers[1] = VIRTUAL_TO_PHYSICAL(gFrameBuffer1);
     gPhysicalFrameBuffers[2] = VIRTUAL_TO_PHYSICAL(gFrameBuffer2);
+#endif
     D_80339CF0 = main_pool_alloc(0x4000, MEMORY_POOL_LEFT);
     set_segment_base_addr(17, (void *) D_80339CF0);
     func_80278A78(&D_80339D10, gMarioAnims, D_80339CF0);
@@ -652,6 +728,8 @@ void game_loop_one_iteration(void) {
             // amount of free space remaining.
             print_text_fmt_int(180, 20, "BUF %d", gGfxPoolEnd - (u8 *) gDisplayListHead);
         }
+        
+        render_fps();
 #ifdef TARGET_N64
     }
 #endif

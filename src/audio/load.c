@@ -102,7 +102,6 @@ extern u8 gSoundDataRaw[];  // sound_data.tbl
 extern u8 gMusicData[];     // sequences.s
 extern u8 gBankSetsData[];  // bank_sets.s
 
-
 /**
  * Performs an immediate DMA copy
  */
@@ -384,7 +383,7 @@ out2:
 
 #ifndef VERSION_EU
 // This function gets optimized out on US due to being static and never called
-static
+static UNUSED
 #endif
 
 void patch_sound(UNUSED struct AudioBankSound *sound, UNUSED u8 *memBase, UNUSED u8 *offsetBase) {
@@ -737,8 +736,8 @@ u8 get_missing_bank(u32 seqId, s32 *nonNullCount, s32 *nullCount) {
 }
 
 struct AudioBank *load_banks_immediate(s32 seqId, u8 *arg1) {
-    void *ret;
-    u32 bankId;
+    void *ret = NULL;
+    u32 bankId = 0;
     u16 offset;
     u8 i;
 

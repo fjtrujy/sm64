@@ -53,8 +53,6 @@ static struct PowerMeterHUD sPowerMeterHUD = {
 // when the power meter is hidden.
 s32 sPowerMeterVisibleTimer = 0;
 
-static struct UnusedHUDStruct sUnusedHUDValues = { 0x00, 0x0A, 0x00 };
-
 static struct CameraHUD sCameraHUD = { CAM_STATUS_NONE };
 
 /**
@@ -116,7 +114,7 @@ void render_dl_power_meter(s16 numHealthWedges) {
         return;
     }
 
-    guTranslate(mtx, (f32) sPowerMeterHUD.x, (f32) sPowerMeterHUD.y, 0);
+    guTranslate(mtx, (f32) sPowerMeterHUD.x, (f32) sPowerMeterHUD.y, 1);
 
     gSPMatrix(gDisplayListHead++, VIRTUAL_TO_PHYSICAL(mtx++),
               G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_PUSH);

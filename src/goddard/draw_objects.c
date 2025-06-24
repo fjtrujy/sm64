@@ -59,7 +59,6 @@ static struct GdColour sClrYellow = { 1.0, 1.0, 0.0 };           // @ 801A80DC
 static struct GdColour sLightColours[1] = { { 1.0, 1.0, 0.0 } }; // @ 801A80E8
 static struct GdColour *sSelectedColour = &sClrRed;              // @ 801A80F4
 struct ObjCamera *gViewUpdateCamera = NULL;                      // @ 801A80F8
-static void *sUnref801A80FC = NULL;
 static s32 sUnreadShapeFlag = 0;       // @ 801A8100
 struct GdColour *sColourPalette[5] = { // @ 801A8104
     &sClrWhite, &sClrYellow, &sClrRed, &sClrBlack, &sClrBlack
@@ -69,20 +68,12 @@ struct GdColour *sWhiteBlack[2] = {
     &sClrWhite,
     &sClrBlack,
 };
-static Mat4f sUnref801A8120 = {
-    { 1.0, 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0, 0.0 }, { 0.0, 0.0, 1.0, 0.0 }, { 0.0, 0.0, 0.0, 1.0 }
-};
-static Mat4f sUnrefIden801A8160 = {
-    { 1.0, 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0, 0.0 }, { 0.0, 0.0, 1.0, 0.0 }, { 0.0, 0.0, 0.0, 1.0 }
-};
+
 static s32 sLightDlCounter = 1; // @ 801A81A0
-static s32 sUnref801A81A4[4] = { 0 };
 
 // bss
-u8 gUnref_801B9B30[0x88];
 struct ObjGroup *gGdLightGroup; // @ 801B9BB8; is this the main light group? only light group?
 
-static u8 sUnref_801B9BBC[0x40];
 static enum SceneType sSceneProcessType; // @ 801B9C00
 static s32 sUseSelectedColor;            // @ 801B9C04
 static s16 sPickBuffer[100];             ///< buffer of objects near click
@@ -260,7 +251,7 @@ void draw_shape_2d(struct ObjShape *shape, s32 flag, UNUSED f32 c, UNUSED f32 d,
         sp1C.y = g;
         sp1C.z = h;
         if (gViewUpdateCamera != NULL) {
-            gd_rotate_and_translate_vec3f(&sp1C, &gViewUpdateCamera->unkE8);
+            gd_rotate_and_translate_vec3f(&sp1C, (const Mat4f *)&gViewUpdateCamera->unkE8);
         }
         translate_load_mtx_gddl(sp1C.x, sp1C.y, sp1C.z);
     }
@@ -695,7 +686,7 @@ void func_80179B64(struct ObjGroup *group) {
 
 /* 22836C -> 228498 */
 void func_80179B9C(struct GdVec3f *pos, struct ObjCamera *cam, struct ObjView *view) {
-    gd_rotate_and_translate_vec3f(pos, &cam->unkE8);
+    gd_rotate_and_translate_vec3f(pos, (const Mat4f *)&cam->unkE8);
     if (pos->z > -256.0f) {
         return;
     }
@@ -1083,25 +1074,6 @@ void create_shape_mtl_gddls(struct ObjShape *shape) {
     if (shape->mtlGroup != NULL) {
         apply_to_obj_types_in_group(OBJ_TYPE_MATERIALS, (applyproc_t) create_mtl_gddl_if_empty,
                                     shape->mtlGroup);
-    }
-}
-
-/**
- * Uncalled function that calls a stubbed function (`func_8017BED0()`) for all
- * `GdObj`s in @p grp
- *
- * @param grp Unknown group of objects
- * @return void
- * @note Not called
- */
-void unref_8017AEDC(struct ObjGroup *grp) {
-    register struct Links *link = grp->link1C;
-
-    while (link != NULL) {
-        struct GdObj *obj = link->obj;
-
-        func_8017BED0(grp, obj);
-        link = link->next;
     }
 }
 
@@ -1517,10 +1489,4 @@ void update_view(struct ObjView *view) {
     gd_enddlsplist_parent();
     imout();
     return;
-}
-/**
- * Stub function.
- * @note Not Called
- */
-void unref_8017BC94(void) {
 }

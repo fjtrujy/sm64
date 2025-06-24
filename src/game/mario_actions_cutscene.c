@@ -216,13 +216,6 @@ s32 geo_switch_peach_eyes(s32 run, struct GraphNode *node, UNUSED s32 a2) {
     return 0;
 }
 
-// unused
-static void stub_is_textbox_active(u16 *a0) {
-    if (get_dialog_id() == -1) {
-        *a0 = 0;
-    }
-}
-
 /**
  * get_star_collection_dialog: Determine what dialog should show when Mario
  * collects a star.
@@ -1494,7 +1487,7 @@ s32 act_squished(struct MarioState *m) {
     UNUSED s32 pad;
     f32 squishAmount;
     f32 spaceUnderCeil;
-    s16 surfAngle;
+    s16 surfAngle = 0;
     s32 underSteepSurf = FALSE; // seems to be responsible for setting velocity?
 
     if ((spaceUnderCeil = m->ceilHeight - m->floorHeight) < 0) {

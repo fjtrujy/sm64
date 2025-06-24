@@ -1,0 +1,200 @@
+diff --git forkSrcPrefix/examples/nehe/lesson04/Makefile forkDstPrefix/examples/nehe/lesson04/Makefile
+index bdf1982f5435da33a961ed609cd0fb8a988cc92d..2d7ba26cba01bb03264268283595217bdb89d3e6 100644
+--- forkSrcPrefix/examples/nehe/lesson04/Makefile
++++ forkDstPrefix/examples/nehe/lesson04/Makefile
+@@ -34,7 +34,11 @@ reset:
+ 	ps2client -h 192.168.1.10 reset
+ 
+ sim: $(EE_BIN)
+-	PCSX2 --elf=$(PWD)/$(EE_BIN)
++ifeq ($(shell uname), Darwin)
++	/Applications/PCSX2.app/Contents/MacOS/PCSX2 -elf $(PWD)/$(EE_BIN)
++else
++	flatpak --filesystem=host run net.pcsx2.PCSX2 $(PWD)/$(EE_BIN) -nogui
++endif
+ 
+ include $(PS2SDK)/samples/Makefile.pref
+ include $(PS2SDK)/samples/Makefile.eeglobal_cpp
+diff --git forkSrcPrefix/glut/src/ps2glut.cpp forkDstPrefix/glut/src/ps2glut.cpp
+index f975dc97a1be19b4f76e34a3c59803df06053dbb..25f42c152034959a424573a0d9c7864de62c7e6a 100644
+--- forkSrcPrefix/glut/src/ps2glut.cpp
++++ forkDstPrefix/glut/src/ps2glut.cpp
+@@ -66,6 +66,7 @@ tFunctionPtr_iii SpecialFunc   = NULL;
+ static CEETimer* Timer0;
+ 
+ static bool printTimes = false;
++static bool firstTime  = false;
+ 
+ /********************************************
+  * macros
+@@ -103,6 +104,7 @@ static bool printTimes = false;
+  */
+ void glutInit(int* argcp, char** argv)
+ {
++    firstTime = true;
+     Pads::Init();
+ 
+     // does the ps2gl library need to be initialized?
+@@ -236,6 +238,13 @@ void glutPostRedisplay(void)
+ 
+ void glutSwapBuffers(void)
+ {
++    if (!firstTime)
++        pglFinishRenderingGeometry(PGL_DONT_FORCE_IMMEDIATE_STOP);
++    else
++        firstTime = false;
++
++    pglWaitForVSync(); // TODO: This is a hack.  We should get rid of it.
++    pglSwapBuffers();
+ }
+ 
+ int glutGet(GLenum type)
+@@ -261,8 +270,6 @@ void pglutFreeDmaMem(void* mem)
+ 
+ void normal_main_loop()
+ {
+-    bool firstTime = true;
+-
+     // init the timing system
+ 
+     Timer0 = new CEETimer(CEETimer::Timer0);
+@@ -298,10 +305,7 @@ void normal_main_loop()
+         }
+ 
+         mStartTimer("wait for vu1");
+-        if (!firstTime)
+-            pglFinishRenderingGeometry(PGL_DONT_FORCE_IMMEDIATE_STOP);
+-        else
+-            firstTime = false;
++
+         mStopTimer("wait for vu1");
+ 
+         mStopTimer("frame time");
+@@ -314,7 +318,7 @@ void normal_main_loop()
+         }
+ 
+         pglWaitForVSync();
+-        pglSwapBuffers();
++        
+         pglRenderGeometry();
+     }
+ }
+diff --git forkSrcPrefix/examples/nehe/lesson02/Makefile forkDstPrefix/examples/nehe/lesson02/Makefile
+index b8f62e33309348a557694f141ee017e0e48d475a..d608b2f5b26dd4097c194bd646459ee34dec6975 100644
+--- forkSrcPrefix/examples/nehe/lesson02/Makefile
++++ forkDstPrefix/examples/nehe/lesson02/Makefile
+@@ -34,7 +34,11 @@ reset:
+ 	ps2client -h 192.168.1.10 reset
+ 
+ sim: $(EE_BIN)
+-	PCSX2 --elf=$(PWD)/$(EE_BIN)
++ifeq ($(shell uname), Darwin)
++	/Applications/PCSX2.app/Contents/MacOS/PCSX2 -elf $(PWD)/$(EE_BIN)
++else
++	PCSX2 -elf $(PWD)/$(EE_BIN) -nogui
++endif
+ 
+ include $(PS2SDK)/samples/Makefile.pref
+ include $(PS2SDK)/samples/Makefile.eeglobal_cpp
+diff --git forkSrcPrefix/examples/nehe/lesson05/Makefile forkDstPrefix/examples/nehe/lesson05/Makefile
+index 9ae34e2354fd1488256498a3b7c09b56de5e6ad4..7d86d77dba7fbcc3aa1fd19025247328383a5e1e 100644
+--- forkSrcPrefix/examples/nehe/lesson05/Makefile
++++ forkDstPrefix/examples/nehe/lesson05/Makefile
+@@ -34,7 +34,11 @@ reset:
+ 	ps2client -h 192.168.1.10 reset
+ 
+ sim: $(EE_BIN)
+-	PCSX2 --elf=$(PWD)/$(EE_BIN)
++ifeq ($(shell uname), Darwin)
++	/Applications/PCSX2.app/Contents/MacOS/PCSX2 -elf $(PWD)/$(EE_BIN)
++else
++	PCSX2 -elf $(PWD)/$(EE_BIN) -nogui
++endif
+ 
+ include $(PS2SDK)/samples/Makefile.pref
+ include $(PS2SDK)/samples/Makefile.eeglobal_cpp
+diff --git forkSrcPrefix/examples/tricked_out/Makefile forkDstPrefix/examples/tricked_out/Makefile
+index b08cfbd2fc6c4f949f6aabc10ea96f780f612d10..f53e18de55e3e51533ba96b98e1c09550559aaab 100644
+--- forkSrcPrefix/examples/tricked_out/Makefile
++++ forkDstPrefix/examples/tricked_out/Makefile
+@@ -30,7 +30,11 @@ reset:
+ 	ps2client -h 192.168.1.10 reset
+ 
+ sim: $(EE_BIN)
+-	PCSX2 --elf=$(PWD)/$(EE_BIN)
++ifeq ($(shell uname), Darwin)
++	/Applications/PCSX2.app/Contents/MacOS/PCSX2 -elf $(PWD)/$(EE_BIN)
++else
++	flatpak --filesystem=host run net.pcsx2.PCSX2 $(PWD)/$(EE_BIN) -nogui
++endif
+ 
+ include $(PS2SDK)/samples/Makefile.pref
+ include $(PS2SDK)/samples/Makefile.eeglobal_cpp
+diff --git forkSrcPrefix/examples/performance/Makefile forkDstPrefix/examples/performance/Makefile
+index 31f35eccab4a842881feceedbdff0d69d32f9ace..2e4fa47fd3bbef09fd22311a99235957e271e5c5 100644
+--- forkSrcPrefix/examples/performance/Makefile
++++ forkDstPrefix/examples/performance/Makefile
+@@ -30,7 +30,11 @@ reset:
+ 	ps2client -h 192.168.1.10 reset
+ 
+ sim: $(EE_BIN)
+-	PCSX2 --elf=$(PWD)/$(EE_BIN)
++ifeq ($(shell uname), Darwin)
++	/Applications/PCSX2.app/Contents/MacOS/PCSX2 -elf $(PWD)/$(EE_BIN) -nogui
++else
++	PCSX2 -elf $(PWD)/$(EE_BIN) -nogui
++endif
+ 
+ include $(PS2SDK)/samples/Makefile.pref
+ include $(PS2SDK)/samples/Makefile.eeglobal_cpp
+diff --git forkSrcPrefix/examples/box/Makefile forkDstPrefix/examples/box/Makefile
+index 0d17e46506c38c39fe3b5e062ce7816ca9f30b30..fc2a164a86a26cd4e0bb081aa71de06d15d151e3 100644
+--- forkSrcPrefix/examples/box/Makefile
++++ forkDstPrefix/examples/box/Makefile
+@@ -30,7 +30,11 @@ reset:
+ 	ps2client -h 192.168.1.10 reset
+ 
+ sim: $(EE_BIN)
+-	PCSX2 --elf=$(PWD)/$(EE_BIN)
++ifeq ($(shell uname), Darwin)
++	/Applications/PCSX2.app/Contents/MacOS/PCSX2 -elf $(PWD)/$(EE_BIN)
++else
++	PCSX2 -elf $(PWD)/$(EE_BIN) -nogui
++endif
+ 
+ include $(PS2SDK)/samples/Makefile.pref
+ include $(PS2SDK)/samples/Makefile.eeglobal_cpp
+diff --git forkSrcPrefix/examples/nehe/lesson03/Makefile forkDstPrefix/examples/nehe/lesson03/Makefile
+index 0e2ebbd44659b69dc45b2b9f5b90ae533e66884a..bebf3cddf0ad259161e6c851407786cc4ee5fd60 100644
+--- forkSrcPrefix/examples/nehe/lesson03/Makefile
++++ forkDstPrefix/examples/nehe/lesson03/Makefile
+@@ -34,7 +34,11 @@ reset:
+ 	ps2client -h 192.168.1.10 reset
+ 
+ sim: $(EE_BIN)
+-	PCSX2 --elf=$(PWD)/$(EE_BIN)
++ifeq ($(shell uname), Darwin)
++	/Applications/PCSX2.app/Contents/MacOS/PCSX2 -elf $(PWD)/$(EE_BIN)
++else
++	PCSX2 -elf $(PWD)/$(EE_BIN) -nogui
++endif
+ 
+ include $(PS2SDK)/samples/Makefile.pref
+ include $(PS2SDK)/samples/Makefile.eeglobal_cpp
+diff --git forkSrcPrefix/examples/logo/Makefile forkDstPrefix/examples/logo/Makefile
+index f6380bb0d4b80c1b2336629b23e27a2e3ec74764..c3820c25b64f0132253cdc673f490819d65a4c5a 100644
+--- forkSrcPrefix/examples/logo/Makefile
++++ forkDstPrefix/examples/logo/Makefile
+@@ -29,7 +29,11 @@ reset:
+ 	ps2client -h 192.168.1.10 reset
+ 
+ sim: $(EE_BIN)
+-	PCSX2 --elf=$(PWD)/$(EE_BIN)
++ifeq ($(shell uname), Darwin)
++	/Applications/PCSX2.app/Contents/MacOS/PCSX2 -elf $(PWD)/$(EE_BIN)
++else
++	PCSX2 -elf $(PWD)/$(EE_BIN) -nogui
++endif
+ 
+ include $(PS2SDK)/samples/Makefile.pref
+ include $(PS2SDK)/samples/Makefile.eeglobal_cpp

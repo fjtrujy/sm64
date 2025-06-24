@@ -4,7 +4,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#if defined(TARGET_PSP)
+extern int isspace(int c);
+#else
 #include <ctype.h>
+#endif
 
 #include "configfile.h"
 
@@ -31,19 +35,21 @@ struct ConfigOption {
  */
 bool configFullscreen            = false;
 // Keyboard mappings (scancode values)
-unsigned int configKeyA          = 0x26;
-unsigned int configKeyB          = 0x33;
-unsigned int configKeyStart      = 0x39;
-unsigned int configKeyR          = 0x36;
-unsigned int configKeyZ          = 0x25;
-unsigned int configKeyCUp        = 0x148;
-unsigned int configKeyCDown      = 0x150;
-unsigned int configKeyCLeft      = 0x14B;
-unsigned int configKeyCRight     = 0x14D;
+unsigned int configKeyA          = 0x004000;
+unsigned int configKeyB          = 0x008000;
+unsigned int configKeyStart      = 0x000008;
+unsigned int configKeyL          = 0x001000;
+unsigned int configKeyR          = 0x000200;
+unsigned int configKeyZ          = 0x000100 | 0x002000;
+unsigned int configKeyCUp        = 0x000010;
+unsigned int configKeyCDown      = 0x000040;
+unsigned int configKeyCLeft      = 0x000080;
+unsigned int configKeyCRight     = 0x000020;
 unsigned int configKeyStickUp    = 0x11;
 unsigned int configKeyStickDown  = 0x1F;
 unsigned int configKeyStickLeft  = 0x1E;
 unsigned int configKeyStickRight = 0x20;
+unsigned int configDeadzone      = 0x20;
 
 
 static const struct ConfigOption options[] = {
@@ -51,6 +57,7 @@ static const struct ConfigOption options[] = {
     {.name = "key_a",          .type = CONFIG_TYPE_UINT, .uintValue = &configKeyA},
     {.name = "key_b",          .type = CONFIG_TYPE_UINT, .uintValue = &configKeyB},
     {.name = "key_start",      .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStart},
+    {.name = "key_l",          .type = CONFIG_TYPE_UINT, .uintValue = &configKeyL},
     {.name = "key_r",          .type = CONFIG_TYPE_UINT, .uintValue = &configKeyR},
     {.name = "key_z",          .type = CONFIG_TYPE_UINT, .uintValue = &configKeyZ},
     {.name = "key_cup",        .type = CONFIG_TYPE_UINT, .uintValue = &configKeyCUp},
@@ -61,13 +68,14 @@ static const struct ConfigOption options[] = {
     {.name = "key_stickdown",  .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStickDown},
     {.name = "key_stickleft",  .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStickLeft},
     {.name = "key_stickright", .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStickRight},
+    {.name = "deadzone",       .type = CONFIG_TYPE_UINT, .uintValue = &configDeadzone},
 };
 
 // Reads an entire line from a file (excluding the newline character) and returns an allocated string
 // Returns NULL if no lines could be read from the file
 static char *read_file_line(FILE *file) {
     char *buffer;
-    size_t bufferSize = 8;
+    size_t bufferSize = 64;
     size_t offset = 0; // offset in buffer to write
 
     buffer = malloc(bufferSize);
@@ -80,7 +88,10 @@ static char *read_file_line(FILE *file) {
         offset = strlen(buffer);
         assert(offset > 0);
 
-        // If a newline was found, remove the trailing newline and exit
+        // If a newline was found, remove the trailing newline and exit, also accept weird libcs
+        if (buffer[offset] == '\0') {
+            break;
+        }
         if (buffer[offset - 1] == '\n') {
             buffer[offset - 1] = '\0';
             break;
@@ -100,7 +111,7 @@ static char *read_file_line(FILE *file) {
 
 // Returns the position of the first non-whitespace character
 static char *skip_whitespace(char *str) {
-    while (isspace(*str))
+    while (isspace((int)*str))
         str++;
     return str;
 }
@@ -108,10 +119,10 @@ static char *skip_whitespace(char *str) {
 // NULL-terminates the current whitespace-delimited word, and returns a pointer to the next word
 static char *word_split(char *str) {
     // Precondition: str must not point to whitespace
-    assert(!isspace(*str));
+    assert(!isspace((int)*str));
 
     // Find either the next whitespace char or end of string
-    while (!isspace(*str) && *str != '\0')
+    while (!isspace((int)*str) && *str != '\0')
         str++;
     if (*str == '\0') // End of string
         return str;
@@ -159,14 +170,15 @@ void configfile_load(const char *filename) {
         char *tokens[2];
         int numTokens;
 
-        while (isspace(*p))
+        while (isspace((int)*p))
             p++;
         numTokens = tokenize_string(p, 2, tokens);
         if (numTokens != 0) {
             if (numTokens == 2) {
                 const struct ConfigOption *option = NULL;
+                unsigned int i;
 
-                for (unsigned int i = 0; i < ARRAY_LEN(options); i++) {
+                for (i = 0; i < ARRAY_LEN(options); i++) {
                     if (strcmp(tokens[0], options[i].name) == 0) {
                         option = &options[i];
                         break;
@@ -183,15 +195,25 @@ void configfile_load(const char *filename) {
                                 *option->boolValue = false;
                             break;
                         case CONFIG_TYPE_UINT:
+                        #if defined(TARGET_PSP)
+                            *option->uintValue = strtoul(tokens[1], NULL, 10);
+                        #else
                             sscanf(tokens[1], "%u", option->uintValue);
+                        #endif
                             break;
                         case CONFIG_TYPE_FLOAT:
+                        #if defined(TARGET_PSP)
+                            *option->floatValue = atof(tokens[1]);
+                        #else
                             sscanf(tokens[1], "%f", option->floatValue);
+                        #endif
                             break;
                         default:
                             assert(0); // bad type
                     }
+                    #ifdef DEBUG
                     printf("option: '%s', value: '%s'\n", tokens[0], tokens[1]);
+                    #endif
                 }
             } else
                 puts("error: expected value");
@@ -205,6 +227,7 @@ void configfile_load(const char *filename) {
 // Writes the config file to 'filename'
 void configfile_save(const char *filename) {
     FILE *file;
+    unsigned int i;
 
     printf("Saving configuration to '%s'\n", filename);
 
@@ -214,7 +237,7 @@ void configfile_save(const char *filename) {
         return;
     }
 
-    for (unsigned int i = 0; i < ARRAY_LEN(options); i++) {
+    for (i = 0; i < ARRAY_LEN(options); i++) {
         const struct ConfigOption *option = &options[i];
 
         switch (option->type) {
@@ -225,7 +248,7 @@ void configfile_save(const char *filename) {
                 fprintf(file, "%s %u\n", option->name, *option->uintValue);
                 break;
             case CONFIG_TYPE_FLOAT:
-                fprintf(file, "%s %f\n", option->name, *option->floatValue);
+                fprintf(file, "%s %f\n", option->name, (double)*option->floatValue);
                 break;
             default:
                 assert(0); // unknown type

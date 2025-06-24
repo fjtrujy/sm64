@@ -21,8 +21,27 @@ NON_MATCHING ?= 0
 TARGET_N64 ?= 0
 # Build for Emscripten/WebGL
 TARGET_WEB ?= 0
+# Build for PSP
+TARGET_PSP ?= 0
+# Build for Dreamcast
+TARGET_DC ?= 0
 # Compiler to use (ido or gcc)
-COMPILER ?= ido
+#COMPILER ?= ido
+
+# Checks for local vs system hexdump
+ifeq (, $(shell which hexdump))
+$(warning "system hexdump is not available please provide a local binary")
+  HEXD_2 := $(shell ./hexdump -h 2> /dev/null)
+  ifndef HEXD_2
+    $(error "local hexdump is not available please install systemwide or provide local a binary")
+  endif
+  HEXDUMP := ./hexdump
+else
+HEXDUMP := hexdump
+endif
+
+# Add a version tag to all builds
+SRC_VER := $(shell git describe --always --abbrev=8 --dirty 2>/dev/null 2>/dev/null || date "+%Y%m%d-%H%M%S")
 
 # Automatic settings only for ports
 ifeq ($(TARGET_N64),0)
@@ -30,13 +49,20 @@ ifeq ($(TARGET_N64),0)
   NON_MATCHING := 1
   GRUCODE := f3dex2e
   TARGET_WINDOWS := 0
+  ifeq ($(TARGET_PSP), 0)
+  ifeq ($(TARGET_DC), 0)
   ifeq ($(TARGET_WEB),0)
     ifeq ($(OS),Windows_NT)
       TARGET_WINDOWS := 1
     else
       # TODO: Detect Mac OS X, BSD, etc. For now, assume Linux
-      TARGET_LINUX := 1
+      ifneq ($(TARGET_PSP), 1)
+      ifneq ($(TARGET_DC), 1)
+        TARGET_LINUX := 1
+      endif
+      endif
     endif
+  endif
   endif
 
   ifeq ($(TARGET_WINDOWS),1)
@@ -75,6 +101,18 @@ ifeq ($(TARGET_N64),0)
     endif
   endif
 
+  endif
+
+#PSP DEFS
+ifeq ($(TARGET_PSP), 1)
+  ENABLE_OPENGL ?= 1
+  NON_MATCHING := 1
+endif
+#Dreamcast DEFS
+ifeq ($(TARGET_DC), 1)
+  ENABLE_OPENGL ?= 1
+  NON_MATCHING := 1
+endif
 endif
 
 ifeq ($(COMPILER),gcc)
@@ -169,7 +207,7 @@ ifneq ($(MAKECMDGOALS),distclean)
 # Make sure assets exist
 NOEXTRACT ?= 0
 ifeq ($(NOEXTRACT),0)
-DUMMY != ./extract_assets.py $(VERSION) >&2 || echo FAIL
+DUMMY != $(PYTHON) ./extract_assets.py $(VERSION) >&2 || echo FAIL
 ifeq ($(DUMMY),FAIL)
   $(error Failed to extract assets)
 endif
@@ -190,12 +228,14 @@ endif
 BUILD_DIR_BASE := build
 ifeq ($(TARGET_N64),1)
   BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)
-else
-ifeq ($(TARGET_WEB),1)
+else ifeq ($(TARGET_WEB),1)
   BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_web
+else ifeq ($(TARGET_PSP),1)
+  BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_psp
+else ifeq ($(TARGET_DC),1)
+  BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_dc
 else
   BUILD_DIR := $(BUILD_DIR_BASE)/$(VERSION)_pc
-endif
 endif
 
 LIBULTRA := $(BUILD_DIR)/libultra.a
@@ -393,6 +433,22 @@ endif
 
 INCLUDE_CFLAGS := -I include -I $(BUILD_DIR) -I $(BUILD_DIR)/include -I src -I .
 
+ifeq ($(TARGET_PSP),1)
+  CC := psp-gcc
+  CPP := cpp -P -Wno-trigraphs
+  AS := psp-as
+  CXX := psp-g++
+  OPT_FLAGS += -march=mips32
+  CC_CFLAGS += -DTARGET_PSP
+endif
+
+ifeq ($(TARGET_DC),1)
+  CC := kos-cc
+  CPP := cpp -P -Wno-trigraphs
+  AS := kos-as
+  CXX := kos-g++
+endif
+
 # Check code syntax with host compiler
 CC_CHECK := gcc
 CC_CHECK_CFLAGS := -fsyntax-only -fsigned-char $(CC_CFLAGS) $(TARGET_CFLAGS) $(INCLUDE_CFLAGS) -std=gnu90 -Wall -Wextra -Wno-format-security -Wno-main -DNON_MATCHING -DAVOID_UB $(VERSION_CFLAGS) $(GRUCODE_CFLAGS)
@@ -439,6 +495,25 @@ CPP := cpp -P
 OBJDUMP := objdump
 OBJCOPY := objcopy
 PYTHON := python3
+ifeq ($(TARGET_PSP),1)
+  CC  := psp-gcc
+  CPP := psp-cpp -P
+  CXX := psp-g++
+  AS  := psp-as
+  LD  := $(CC)
+  OBJDUMP := psp-objdump
+  OBJCOPY := psp-objcopy
+endif
+ifeq ($(TARGET_DC),1)
+  CC  := kos-cc
+  CPP := sh-elf-cpp -P
+  CXX := kos-c++
+  AS  := kos-as
+  LD  := $(CC)
+  OBJDUMP := sh-elf-objdump
+  OBJCOPY := sh-elf-objcopy
+  CC_CHECK_CFLAGS += -DPSP_LEGACY_TYPES_DEFINED -DPSP_LEGACY_VOLATILE_TYPES_DEFINED
+endif
 
 # Platform-specific compiler and linker flags
 ifeq ($(TARGET_WINDOWS),1)
@@ -448,6 +523,20 @@ endif
 ifeq ($(TARGET_LINUX),1)
   PLATFORM_CFLAGS  := -DTARGET_LINUX `pkg-config --cflags libusb-1.0`
   PLATFORM_LDFLAGS := -lm -lpthread `pkg-config --libs libusb-1.0` -lasound -lpulse -no-pie
+endif
+ifeq ($(TARGET_PSP),1)
+  PSPSDK_PREFIX = $(shell psp-config -p)
+  PSP_PREFIX    = $(shell psp-config -P)
+  # Notes from neo
+  #-gdwarf-2 -gstrict-dwarf -g3 --ffunction-sections -fdata-sections -Wl,-gc-sections
+  PLATFORM_CFLAGS  := -DTARGET_PSP -DPSP -D__PSP__ -DSRC_VER=\"$(SRC_VER)\" -DPSP_LEGACY_TYPES_DEFINED -DPSP_LEGACY_VOLATILE_TYPES_DEFINED -I$(PSPSDK_PREFIX)/include -G0 -D_PSP_FW_VERSION=500 -DNDEBUG -O3 -g3 -fsingle-precision-constant -funroll-loops -fipa-pta -Werror
+  PLATFORM_LDFLAGS := -I$(PSPSDK_PREFIX)/lib -specs=$(PSPSDK_PREFIX)/lib/prxspecs -Wl,-q,-T$(PSPSDK_PREFIX)/lib/linkfile.prx $(PSPSDK_PREFIX)/lib/prxexports.o
+endif
+ifeq ($(TARGET_DC),1)
+  #Notes from neo
+  #-gdwarf-2 -gstrict-dwarf -g3 --ffunction-sections -fdata-sections -Wl,-gc-sections
+  PLATFORM_CFLAGS  := $(KOS_CFLAGS) -DTARGET_DC -DNDEBUG -Isrc/pc/gfx/gldc -Wall -Wextra -g3
+  PLATFORM_LDFLAGS := -Wl,--gc-sections  -Wl,-Map=output.map
 endif
 ifeq ($(TARGET_WEB),1)
   PLATFORM_CFLAGS  := -DTARGET_WEB
@@ -472,6 +561,14 @@ ifeq ($(ENABLE_OPENGL),1)
     GFX_CFLAGS  += -s USE_SDL=2
     GFX_LDFLAGS += -lGL -lSDL2
   endif
+  ifeq ($(TARGET_PSP),1)
+    GFX_LDFLAGS += -Wl,-zmax-page-size=128 -L$(PSPSDK_PREFIX)/lib src/pc/libME.a -lpspdebug -lpspgu -lpspvram \
+    -lpsppower -lpspdisplay -lpspge -lpspctrl -lpspaudio
+  endif
+  ifeq ($(TARGET_DC),1)
+    GFX_CFLAGS  += -Isrc/pc/audio/aldc2
+    GFX_LDFLAGS += src/pc/gfx/gldc/libGLdc.a src/pc/audio/aldc2/libAL.a -lm
+  endif
 endif
 ifeq ($(ENABLE_DX11),1)
   GFX_CFLAGS := -DENABLE_DX11
@@ -482,15 +579,22 @@ ifeq ($(ENABLE_DX12),1)
   PLATFORM_LDFLAGS += -lgdi32 -static
 endif
 
+#ifneq ($(TARGET_DC),1)
 GFX_CFLAGS += -DWIDESCREEN
+#endif
 
 CC_CHECK := $(CC) -fsyntax-only -fsigned-char $(INCLUDE_CFLAGS) -Wall -Wextra -Wno-format-security -D_LANGUAGE_C $(VERSION_CFLAGS) $(MATCH_CFLAGS) $(PLATFORM_CFLAGS) $(GFX_CFLAGS) $(GRUCODE_CFLAGS)
-CFLAGS := $(OPT_FLAGS) $(INCLUDE_CFLAGS) -D_LANGUAGE_C $(VERSION_CFLAGS) $(MATCH_CFLAGS) $(PLATFORM_CFLAGS) $(GFX_CFLAGS) $(GRUCODE_CFLAGS) -fno-strict-aliasing -fwrapv -march=native
+CFLAGS := $(OPT_FLAGS) $(INCLUDE_CFLAGS) -D_LANGUAGE_C $(VERSION_CFLAGS) $(MATCH_CFLAGS) $(PLATFORM_CFLAGS) $(GFX_CFLAGS) $(GRUCODE_CFLAGS) -fno-strict-aliasing -fwrapv
 
 ASFLAGS := -I include -I $(BUILD_DIR) $(VERSION_ASFLAGS)
 
 LDFLAGS := $(PLATFORM_LDFLAGS) $(GFX_LDFLAGS)
 
+ifneq ($(TARGET_PSP), 1)
+ifneq ($(TARGET_DC), 1)
+CFLAGS+=-march=native
+endif
+endif
 endif
 
 ####################### Other Tools #########################
@@ -539,7 +643,7 @@ clean:
 
 distclean:
 	$(RM) -r $(BUILD_DIR_BASE)
-	./extract_assets.py --clean
+	$(PYTHON) ./extract_assets.py --clean
 
 test: $(ROM)
 	$(EMULATOR) $(EMU_FLAGS) $<
@@ -615,7 +719,7 @@ $(BUILD_DIR)/%: %.png
 	$(N64GRAPHICS) -i $@ -g $< -f $(lastword $(subst ., ,$@))
 
 $(BUILD_DIR)/%.inc.c: $(BUILD_DIR)/% %.png
-	hexdump -v -e '1/1 "0x%X,"' $< > $@
+	$(HEXDUMP) -v -e '1/1 "0x%X,"' $< > $@
 	echo >> $@
 
 # Color Index CI8
@@ -672,11 +776,12 @@ $(BUILD_DIR)/rsp/%.bin $(BUILD_DIR)/rsp/%_data.bin: rsp/%.s
 	$(RSPASM) -sym $@.sym -definelabel $(VERSION_DEF) 1 -definelabel $(GRUCODE_DEF) 1 -strequ CODE_FILE $(BUILD_DIR)/rsp/$*.bin -strequ DATA_FILE $(BUILD_DIR)/rsp/$*_data.bin $<
 
 $(ENDIAN_BITWIDTH): tools/determine-endian-bitwidth.c
-	$(CC) -c $(CFLAGS) -o $@.dummy2 $< 2>$@.dummy1; true
-	grep -o 'msgbegin --endian .* --bitwidth .* msgend' $@.dummy1 > $@.dummy2
-	head -n1 <$@.dummy2 | cut -d' ' -f2-5 > $@
-	@rm $@.dummy1
-	@rm $@.dummy2
+	echo "--endian little --bitwidth 32" > $@
+#	$(CC) -c $(CFLAGS) -o $@.dummy2 $< 2>$@.dummy1; true
+#	grep -o 'msgbegin --endian .* --bitwidth .* msgend' $@.dummy1 > $@.dummy2
+#	head -n1 <$@.dummy2 | cut -d' ' -f2-5 > $@
+#	@rm $@.dummy1
+#	@rm $@.dummy2
 
 $(SOUND_BIN_DIR)/sound_data.ctl: sound/sound_banks/ $(SOUND_BANK_FILES) $(SOUND_SAMPLE_AIFCS) $(ENDIAN_BITWIDTH)
 	$(PYTHON) tools/assemble_sound.py $(BUILD_DIR)/sound/samples/ sound/sound_banks/ $(SOUND_BIN_DIR)/sound_data.ctl $(SOUND_BIN_DIR)/sound_data.tbl $(VERSION_CFLAGS) $$(cat $(ENDIAN_BITWIDTH))
@@ -699,10 +804,10 @@ $(SOUND_BIN_DIR)/%.m64: $(SOUND_BIN_DIR)/%.o
 	$(OBJCOPY) -j .rodata $< -O binary $@
 
 $(SOUND_BIN_DIR)/%.o: $(SOUND_BIN_DIR)/%.s
-	$(AS) $(ASFLAGS) -o $@ $<
+	$(AS) $(ASFLAGS) -o $@ $< -Z  2> /dev/null
 
 $(SOUND_BIN_DIR)/%.inc.c: $(SOUND_BIN_DIR)/%
-	hexdump -v -e '1/1 "0x%X,"' $< > $@
+	$(HEXDUMP) -v -e '1/1 "0x%X,"' $< > $@
 	echo >> $@
 
 $(SOUND_BIN_DIR)/sound_data.o: $(SOUND_BIN_DIR)/sound_data.ctl.inc.c $(SOUND_BIN_DIR)/sound_data.tbl.inc.c $(SOUND_BIN_DIR)/sequences.bin.inc.c $(SOUND_BIN_DIR)/bank_sets.inc.c
@@ -784,8 +889,8 @@ $(BUILD_DIR)/%.o: %.cpp
 
 $(BUILD_DIR)/%.o: %.c
 	@$(CC_CHECK) $(CC_CHECK_CFLAGS) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
-	$(CC) -c $(CFLAGS) -o $@ $<
-
+	@echo $@
+	@$(CC) -c $(CFLAGS) -o $@ $<
 
 $(BUILD_DIR)/%.o: $(BUILD_DIR)/%.c
 	@$(CC_CHECK) $(CC_CHECK_CFLAGS) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
@@ -817,7 +922,35 @@ $(BUILD_DIR)/$(TARGET).objdump: $(ELF)
 
 else
 $(EXE): $(O_FILES) $(MIO0_FILES:.mio0=.o) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES)
-	$(LD) -L $(BUILD_DIR) -o $@ $(O_FILES) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
+	@echo "Linking $@"
+	@$(LD) -L $(BUILD_DIR) -o $@ $(O_FILES) $(SOUND_OBJ_FILES) $(ULTRA_O_FILES) $(GODDARD_O_FILES) $(LDFLAGS)
+ifeq ($(TARGET_PSP),1)
+	psp-fixup-imports $@
+	psp-prxgen $@ $@.prx
+
+TITLE := "sm64-port $(SRC_VER)"
+
+pbp: $(EXE)
+	@mkdir -p $(BUILD_DIR)/mario64
+	cp psp/snd_eng.prx $(BUILD_DIR)/mario64/
+	mksfoex -d MEMSIZE=1 $(TITLE) $(BUILD_DIR)/PARAM.SFO
+	pack-pbp $(BUILD_DIR)/mario64/EBOOT.PBP $(BUILD_DIR)/PARAM.SFO psp/EBOOT/ICON0.png NULL NULL psp/EBOOT/PIC0.png psp/EBOOT/SND0.at3 $(EXE).prx NULL
+
+.PHONY: pbp
+endif
+ifeq ($(TARGET_DC),1)
+
+# Unused for now, might be later
+include $(KOS_BASE)/Makefile.rules
+elf: $(EXE)
+	sh-elf-objcopy -R .stack -O binary $< $<.bin
+
+scramble: elf
+	$(KOS_BASE)/utils/scramble/scramble $(EXE).bin $(BUILD_DIR)/1ST_READ.bin
+
+.PHONY: scramble
+.PHONY: elf
+endif
 endif
 
 

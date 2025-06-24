@@ -1,3 +1,7 @@
+# PSP Port of PC
+
+PSP Project Discord: https://discord.gg/5w4B69
+
 # Super Mario 64 Port
 
 - This repo contains a full decompilation of Super Mario 64 (J), (U), and (E) with minor exceptions in the audio subsystem.
@@ -31,7 +35,59 @@ A prior copy of the game is required to extract the assets.
 6. Run `make` to build. Qualify the version through `make VERSION=<VERSION>`. Add `-j4` to improve build speed (hardware dependent based on the amount of CPU cores available).
 7. The executable binary will be located at `build/<VERSION>_pc/sm64.<VERSION>.f3dex2e.exe` inside the repository.
 
-#### Troubleshooting
+### Sony PSP
+Notes: Currently only supported building under linux and WSL
+
+**There is a file in the ``psp/`` folder called ``snd_eng.prx``**
+- This file is used to accelerate the sound generation and increase performance. 
+- It belongs next to the EBOOT.PBP or PRX.
+
+**Fixed textures live in the psp/textures/ folder. copy these into textures/, overwrite the extracted ones, and rebuild**
+
+1. Install the PSP toolchain https://github.com/pspdev/psptoolchain.
+2. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`. **Note: Only US supported**
+3. Run `make TARGET_PSP=1`
+4. Optionally if you would prefer an EBOOT.PBP for use on CFW Run `make TARGET_PSP=1 pbp` , and the folder `mario64` will be made in the build folder.
+
+**Windows Instructions : NOTE UNSUPPORTED currently, must follow directions exactly!**
+1. Install the PSP toolchain https://darksectordds.github.io/html/MinimalistPSPSDK/index.html
+2. Install Python3 from python.org, NOT the Windows Store
+2. Download this pack of helpful tools http://www.mediafire.com/file/jogmmqfwclmji3v/file
+3. Add the full path of where you installed the pspsdk eg. ``C:\pspsdk\bin`` to your environment variables
+3. Copy the files from `pspsdk_bin/` from the windows pack into the `bin` folder where you installed the pspsdk. The same folder you used above.
+4. Copy `python3.exe` from the windows pack, next to makefile and baserom
+5. Make a folder called `tmp`, next to makefile and baserom
+6. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`.
+7. Copy files in `tools/` from the windows pack to `tools` folder in source, next to makefile and baserom
+8. Open Powershell in the sm64 folder and run this:
+9. Run `make -t -s -C .\tools\` and ignore the line about `make: /bin/sh: Command not found`
+10. Go back to powershell window:
+11. Run `$PSDefaultParameterValues['*:Encoding'] = 'utf8'` Only needed if using Powershell, if using cmd.exe you can skip this.
+12. Run `make TARGET_PSP=1 SHELL=sh PYTHON=py`
+13. Optionally if you would prefer an EBOOT.PBP for use on CFW Run `make TARGET_PSP=1 SHELL=sh PYTHON=py pbp`, and the folder `mario64` will be made in the build folder.
+
+**Docker Instructions**
+
+1. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`. **Note: Only US supported**
+2. Run the Docker container donated by mkst: `docker run --rm -ti -v $(pwd):/sm64 markstreet/sm64:psp make TARGET_PSP=1 pbp --jobs`
+3. This will produce an EBOOT.PBP in `build/VERSION_psp/mario64/` folder along with `snd_eng.prx` for transfer to any CFW enabled Sony PSP.
+
+### Sega Dreamcast
+**Fixed textures live in the psp/textures/ folder. copy these into textures/, overwrite the extracted ones, and rebuild**
+
+1. Install the Dreamcast toolchain https://github.com/KallistiOS/KallistiOS/tree/master/utils/dc-chain.
+2. Install python3
+3. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`. **Note: Only US supported**
+4. Run `make TARGET_DC=1 scramble`
+5. This will produce a scrambled binary called `1ST_READ.BIN` ready to be burned onto a cd-r for use in a Dreamcast.
+
+**Docker Instructions**
+
+1. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`. **Note: Only US supported**
+2. Run the Docker container donated by mkst: `docker run --rm -ti -v $(pwd):/sm64 markstreet/sm64:dreamcast make TARGET_DC=1 scramble --jobs`
+3. This will produce a scrambled binary called `1ST_READ.BIN` ready to be burned onto a cd-r for use in a Dreamcast.
+
+### Troubleshooting (For Any Platform)
 
 1. If you get `make: gcc: command not found` or `make: gcc: No such file or directory` although the packages did successfully install, you probably launched the wrong MSYS2. Read the instructions again. The terminal prompt should contain "MINGW32" or "MINGW64" in purple text, and **NOT** "MSYS".
 2. If you get `Failed to open baserom.us.z64!` you failed to place the baserom in the repository. You can write `ls` to list the files in the current working directory. If you are in the `sm64-port` directory, make sure you see it here.

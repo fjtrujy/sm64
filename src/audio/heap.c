@@ -53,8 +53,6 @@ u8 gAudioResetPresetIdToLoad;
 s32 gAudioResetFadeOutFramesLeft;
 #endif
 
-u8 gAudioUnusedBuffer[0x1000];
-
 extern s32 gMaxAudioCmds;
 
 #ifdef VERSION_EU
@@ -216,7 +214,10 @@ void *soundAlloc(struct SoundAllocPool *pool, u32 size) {
     u8 *start;
     s32 last;
     s32 i;
-
+    /* Possible crash point */
+    if(pool->cur == NULL){
+        return NULL;
+    }
     if ((pool->cur + ALIGN16(size) <= pool->size + pool->start)) {
         start = pool->cur;
         pool->cur += ALIGN16(size);
@@ -301,11 +302,6 @@ void temporary_pools_init(struct PoolSplit *a) {
     temporary_pool_clear(&gUnusedLoadedPool.temporary);
 }
 
-#ifndef VERSION_EU
-static void unused_803163D4(void) {
-}
-#endif
-
 void *alloc_bank_or_seq(struct SoundMultiPool *arg0, s32 arg1, s32 size, s32 arg3, s32 id) {
     // arg3 = 0, 1 or 2?
 
@@ -321,8 +317,8 @@ void *alloc_bank_or_seq(struct SoundMultiPool *arg0, s32 arg1, s32 size, s32 arg
     u16 secondVal;
 #endif
     u32 nullID = -1;
-    u8 *table;
-    u8 isSound;
+    u8 *table = NULL;
+    u8 isSound = FALSE;
 #ifndef VERSION_EU
     u16 firstVal;
     u16 secondVal;
