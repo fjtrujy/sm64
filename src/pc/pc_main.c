@@ -17,12 +17,14 @@
 #include "gfx/gfx_dxgi.h"
 #include "gfx/gfx_glx.h"
 #include "gfx/gfx_sdl.h"
+#include "gfx/gfx_ps2.h"
 
 #include "audio/audio_api.h"
 #include "audio/audio_wasapi.h"
 #include "audio/audio_pulse.h"
 #include "audio/audio_alsa.h"
 #include "audio/audio_sdl.h"
+#include "audio/audio_ps2.h"
 #include "audio/audio_null.h"
 
 #include "controller/controller_keyboard.h"
@@ -32,6 +34,17 @@
 #include "compat.h"
 
 #define CONFIG_FILE "sm64config.txt"
+
+#ifdef TARGET_PS2
+# include <tamtypes.h>
+# include <kernel.h>
+# include <iopcontrol.h>
+# include <sifrpc.h>
+# include <loadfile.h>
+# include <sbv_patches.h>
+# include <ps2_filesystem_driver.h>
+# include "ps2_memcard.h"
+#endif
 
 OSMesg D_80339BEC;
 OSMesgQueue gSIEventMesgQueue;
@@ -67,8 +80,6 @@ void send_display_list(struct SPTask *spTask) {
     gfx_run((Gfx *)spTask->task.t.data_ptr);
 }
 
-#define printf
-
 #ifdef VERSION_EU
 #define SAMPLES_HIGH 656
 #define SAMPLES_LOW 640
@@ -77,24 +88,22 @@ void send_display_list(struct SPTask *spTask) {
 #define SAMPLES_LOW 528
 #endif
 
+static s16 audio_buffer[SAMPLES_HIGH * 2 * 2];
+
+static inline void audio_frame(void) {
+    int samples_left = audio_api->buffered();
+    u32 num_audio_samples = samples_left < audio_api->get_desired_buffered() ? SAMPLES_HIGH : SAMPLES_LOW;
+    s16 audio_buffer[SAMPLES_HIGH * 2 * 2];
+    for (int i = 0; i < 2; i++) {
+        create_next_audio_buffer(audio_buffer + i * (num_audio_samples * 2), num_audio_samples);
+    }
+    audio_api->play((u8 *)audio_buffer, 2 * num_audio_samples * 4);
+}
+
 void produce_one_frame(void) {
     gfx_start_frame();
     game_loop_one_iteration();
-    
-    int samples_left = audio_api->buffered();
-    u32 num_audio_samples = samples_left < audio_api->get_desired_buffered() ? SAMPLES_HIGH : SAMPLES_LOW;
-    //printf("Audio samples: %d %u\n", samples_left, num_audio_samples);
-    s16 audio_buffer[SAMPLES_HIGH * 2 * 2];
-    for (int i = 0; i < 2; i++) {
-        /*if (audio_cnt-- == 0) {
-            audio_cnt = 2;
-        }
-        u32 num_audio_samples = audio_cnt < 2 ? 528 : 544;*/
-        create_next_audio_buffer(audio_buffer + i * (num_audio_samples * 2), num_audio_samples);
-    }
-    //printf("Audio samples before submitting: %d\n", audio_api->buffered());
-    audio_api->play((u8 *)audio_buffer, 2 * num_audio_samples * 4);
-    
+    audio_frame();
     gfx_end_frame();
 }
 
@@ -131,6 +140,30 @@ static void on_anim_frame(double time) {
 }
 #endif
 
+#ifdef TARGET_PS2
+void reset_IOP() {
+    SifInitRpc(0);
+    while (!SifIopReset(NULL, 0)) {} // Comment this line if you want to "debug" through ps2link
+    while (!SifIopSync()) {} 
+}
+
+static void prepare_IOP() {
+    reset_IOP();
+    SifInitRpc(0);
+    sbv_patch_enable_lmb();
+    sbv_patch_disable_prefix_check();
+}
+
+static void init_drivers() {
+	init_ps2_filesystem_driver();
+    ps2_memcard_init();
+}
+
+static void deinit_drivers() {
+	deinit_ps2_filesystem_driver();
+}
+#endif
+
 static void save_config(void) {
     configfile_save(CONFIG_FILE);
 }
@@ -141,6 +174,12 @@ static void on_fullscreen_changed(bool is_now_fullscreen) {
 
 void main_func(void) {
     static u64 pool[0x165000/8 / 4 * sizeof(void *)];
+
+#ifdef TARGET_PS2
+    prepare_IOP();
+    init_drivers();
+#endif
+
     main_pool_init(pool, pool + sizeof(pool) / sizeof(pool[0]));
     gEffectsMemoryPool = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
 
@@ -158,6 +197,9 @@ void main_func(void) {
 #elif defined(ENABLE_DX11)
     rendering_api = &gfx_direct3d11_api;
     wm_api = &gfx_dxgi_api;
+#elif defined(TARGET_PS2)
+    rendering_api = &gfx_ps2_rapi;
+    wm_api = &gfx_ps2_wapi;
 #elif defined(ENABLE_OPENGL)
     rendering_api = &gfx_opengl_api;
     #if defined(__linux__) || defined(__BSD__)
@@ -171,7 +213,7 @@ void main_func(void) {
     
     wm_api->set_fullscreen_changed_callback(on_fullscreen_changed);
     wm_api->set_keyboard_callbacks(keyboard_on_key_down, keyboard_on_key_up, keyboard_on_all_keys_up);
-    
+
 #if HAVE_WASAPI
     if (audio_api == NULL && audio_wasapi.init()) {
         audio_api = &audio_wasapi;
@@ -192,6 +234,11 @@ void main_func(void) {
         audio_api = &audio_sdl;
     }
 #endif
+#ifdef TARGET_PS2
+    if (audio_api == NULL && audio_ps2.init()) {
+        audio_api = &audio_ps2;
+    }
+#endif
     if (audio_api == NULL) {
         audio_api = &audio_null;
     }
@@ -210,6 +257,9 @@ void main_func(void) {
     while (1) {
         wm_api->main_loop(produce_one_frame);
     }
+#endif
+#ifdef TARGET_PS2
+    deinit_drivers();
 #endif
 }
 

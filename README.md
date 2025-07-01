@@ -8,6 +8,53 @@
 This repo does not include all assets necessary for compiling the game.
 A prior copy of the game is required to extract the assets.
 
+## Building PS2 executables
+
+### Using Docker
+
+0. Ensure Git and Docker are installed on your system.
+1. Check out repo, submodules, etc:
+```
+git clone https://github.com/fgsfdsfgs/sm64-port.git -b ps2 --recursive
+cd sm64-port
+```
+2. Copy in your baserom.XX.z64: `cp /path/to/baserom.us.z64 .`
+3. Build Docker image: `docker build . -t sm64_ps2`
+4. Compile using your Docker image: `docker run --rm -ti -v $(pwd):/sm64 sm64_ps2 make --jobs 4`
+
+### Manually under Linux (WSL can work, MSYS2 probably won't work)
+
+0. Ensure Git, GCC, GNU Make and Python 3 are installed on your system:
+```
+# for example on Debian or Debian based distros (Ubuntu, Pop!_OS and others)
+sudo apt install git build-essential python3
+```
+1. Ensure PS2DEV toolchain are installed on your system and the environmental variables `PS2DEV` and `PS2SDK` are defined is in your `PATH`.
+You can follow the installation instructions in the [ps2dev repo](https://github.com/ps2dev/ps2dev), or you can get the latest stable binaries and use them:
+```
+wget https://github.com/ps2dev/ps2dev/releases/download/latest/ps2dev-ubuntu-latest.tar.gz
+tar xvzf ps2dev-ubuntu-latest.tar.gz
+export PATH="$(pwd)/ps2dev/ee/bin:$(pwd)/ps2dev/iop/bin:$(pwd)/sm64-port/tools:${PATH}"
+export PS2DEV=$(pwd)/ps2dev
+export PS2SDK=$(pwd)/ps2dev/ps2sdk
+```
+2. Check out repo, submodules, etc:
+```
+git clone https://github.com/fgsfdsfgs/sm64-port.git -b ps2 --recursive
+cd sm64-port
+```
+3. Copy in your baserom.XX.z64: `cp /path/to/baserom.us.z64 .`
+4. Compile: `make -j4`
+
+In both cases, the resulting ELF will be in `build/<region>_ps2/`.
+
+### (Optional) Strip and pack resulting ELF:
+```
+ee-strip --strip-all build/us_ps2/sm64.us.f3dex2e.elf
+ps2-packer build/us_ps2/sm64.us.f3dex2e.elf build/us_ps2/sm64.packed.elf
+```
+Remember that packed ELFs will take a while to unpack before starting.
+
 ## Building native executables
 
 ### Linux
@@ -17,6 +64,10 @@ A prior copy of the game is required to extract the assets.
 3. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`.
 4. Run `make` to build. Qualify the version through `make VERSION=<VERSION>`. Add `-j4` to improve build speed (hardware dependent based on the amount of CPU cores available).
 5. The executable binary will be located at `build/<VERSION>_pc/sm64.<VERSION>.f3dex2e`.
+
+### MacOS
+
+Same steps as Linux, however, be sure you use the `gnu make`, run `brew install make` and then, update your `PATH` variable with `export PATH="$(brew --prefix make)/libexec/gnubin:$PATH"`
 
 ### Windows
 

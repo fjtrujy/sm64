@@ -1,5 +1,5 @@
-FROM ubuntu:18.04 as build
-
+FROM ubuntu:latest as build
+ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get install -y \
         binutils-mips-linux-gnu \
@@ -9,16 +9,15 @@ RUN apt-get update && \
         python3 \
         wget
 
-RUN wget \
-        https://github.com/n64decomp/qemu-irix/releases/download/v2.11-deb/qemu-irix-2.11.0-2169-g32ab296eef_amd64.deb \
-        -O qemu.deb && \
-    echo 8170f37cf03a08cc2d7c1c58f10d650ea0d158f711f6916da9364f6d8c85f741 qemu.deb | sha256sum --check && \
-    dpkg -i qemu.deb && \
-    rm qemu.deb
+RUN wget https://github.com/ps2dev/ps2dev/releases/download/latest/ps2dev-ubuntu-latest.tar.gz && \
+    tar xzf ps2dev-ubuntu-latest.tar.gz && \
+    rm ps2dev-ubuntu-latest.tar.gz
 
 RUN mkdir /sm64
 WORKDIR /sm64
-ENV PATH="/sm64/tools:${PATH}"
+ENV PATH="/ps2dev/ee/bin:/ps2dev/iop/bin:/sm64/tools:${PATH}"
+ENV PS2DEV=/ps2dev
+ENV PS2SDK=/ps2dev/ps2sdk
+ENV GSKIT=/ps2dev/gsKit
 
-CMD echo 'usage: docker run --rm --mount type=bind,source="$(pwd)",destination=/sm64 sm64 make VERSION=${VERSION:-us} -j4\n' \
-         'see https://github.com/n64decomp/sm64/blob/master/README.md for advanced usage'
+CMD echo 'usage: docker run --rm --mount type=bind,source="$(pwd)",destination=/sm64 sm64 make VERSION=${VERSION:-us} -j4'

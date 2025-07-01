@@ -15,6 +15,12 @@
 #define MENU_DATA_MAGIC 0x4849
 #define SAVE_FILE_MAGIC 0x4441
 
+#ifdef TARGET_N64
+# define EEPROM_TRIES 4
+#else
+# define EEPROM_TRIES 1
+#endif
+
 STATIC_ASSERT(sizeof(struct SaveBuffer) == EEPROM_SIZE, "eeprom buffer size must match");
 
 extern struct SaveBuffer gSaveBuffer;
@@ -60,7 +66,7 @@ static s32 read_eeprom_data(void *buffer, s32 size) {
     s32 status = 0;
 
     if (gEepromProbe != 0) {
-        s32 triesLeft = 4;
+        s32 triesLeft = EEPROM_TRIES;
         u32 offset = (u32)((u8 *) buffer - (u8 *) &gSaveBuffer) / 8;
 
         do {
@@ -88,7 +94,7 @@ static s32 write_eeprom_data(void *buffer, s32 size) {
     s32 status = 1;
 
     if (gEepromProbe != 0) {
-        s32 triesLeft = 4;
+        s32 triesLeft = EEPROM_TRIES;
         u32 offset = (u32)((u8 *) buffer - (u8 *) &gSaveBuffer) >> 3;
 
         do {

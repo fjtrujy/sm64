@@ -4,6 +4,9 @@
 #ifdef TARGET_N64
 #define IS_64_BIT 0
 #define IS_BIG_ENDIAN 1
+#elif defined(TARGET_PSP)
+#define IS_64_BIT 0
+#define IS_BIG_ENDIAN 0
 #else
 #include <stdint.h>
 #define IS_64_BIT (UINTPTR_MAX == 0xFFFFFFFFFFFFFFFFU)

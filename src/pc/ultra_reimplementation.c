@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include "lib/src/libultra_internal.h"
 #include "macros.h"
 
@@ -7,9 +8,18 @@
 #include <emscripten.h>
 #endif
 
+#ifdef TARGET_PSP
+#include <pspkernel.h>
+#include <pspthreadman.h>
+#endif
+
 extern OSMgrArgs piMgrArgs;
 
 u64 osClockRate = 62500000;
+u64 osCounterRate = 46875000;
+
+#define OS_COUNTER_NUM (osCounterRate / 1000ULL)
+#define OS_COUNTER_DEN (1000000ULL / 1000ULL)
 
 s32 osPiStartDma(UNUSED OSIoMesg *mb, UNUSED s32 priority, UNUSED s32 direction,
                  uintptr_t devAddr, void *vAddr, size_t nbytes,
@@ -75,7 +85,9 @@ void osViSwapBuffer(UNUSED void *vaddr) {
 }
 
 OSTime osGetTime(void) {
-    return 0;
+    
+	u64 sysGetMicroseconds = sceKernelGetSystemTimeWide();
+    return (sysGetMicroseconds * OS_COUNTER_NUM) / OS_COUNTER_DEN;
 }
 
 void osWritebackDCacheAll(void) {
@@ -88,8 +100,7 @@ void osInvalDCache(UNUSED void *a, UNUSED size_t b) {
 }
 
 u32 osGetCount(void) {
-    static u32 counter;
-    return counter++;
+    return (u32)osGetTime();
 }
 
 s32 osAiSetFrequency(u32 freq) {
@@ -122,10 +133,10 @@ s32 osEepromProbe(UNUSED OSMesgQueue *mq) {
 }
 
 s32 osEepromLongRead(UNUSED OSMesgQueue *mq, u8 address, u8 *buffer, int nbytes) {
-    u8 content[512];
+    u8 content[512] = {0};
     s32 ret = -1;
 
-#ifdef TARGET_WEB
+#if defined(TARGET_WEB)
     if (EM_ASM_INT({
         var s = localStorage.sm64_save_file;
         if (s && s.length === 684) {
@@ -145,6 +156,9 @@ s32 osEepromLongRead(UNUSED OSMesgQueue *mq, u8 address, u8 *buffer, int nbytes)
         memcpy(buffer, content + address * 8, nbytes);
         ret = 0;
     }
+#elif defined(TARGET_PS2)
+    if (ps2_memcard_load(buffer, address * 8, nbytes))
+        ret = 0;
 #else
     FILE *fp = fopen("sm64_save_file.bin", "rb");
     if (fp == NULL) {
@@ -166,7 +180,7 @@ s32 osEepromLongWrite(UNUSED OSMesgQueue *mq, u8 address, u8 *buffer, int nbytes
     }
     memcpy(content + address * 8, buffer, nbytes);
 
-#ifdef TARGET_WEB
+#if defined(TARGET_WEB)
     EM_ASM({
         var str = "";
         for (var i = 0; i < 512; i++) {
@@ -175,6 +189,10 @@ s32 osEepromLongWrite(UNUSED OSMesgQueue *mq, u8 address, u8 *buffer, int nbytes
         localStorage.sm64_save_file = btoa(str);
     }, content);
     s32 ret = 0;
+#elif defined(TARGET_PS2)
+    s32 ret = -1;
+    if (ps2_memcard_save(buffer, address * 8, nbytes))
+        ret = 0;
 #else
     FILE* fp = fopen("sm64_save_file.bin", "wb");
     if (fp == NULL) {

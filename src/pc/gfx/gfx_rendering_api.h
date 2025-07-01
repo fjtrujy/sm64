@@ -30,6 +30,9 @@ struct GfxRenderingAPI {
     void (*start_frame)(void);
     void (*end_frame)(void);
     void (*finish_render)(void);
+    void (*upload_texture_ext)(const uint8_t *buf, int width, int height, int fmt, int bpp, const uint8_t *pal);
+    void (*flush_textures)(void);
+    void (*set_fog_color)(const uint8_t r, const uint8_t g, const uint8_t b);
 };
 
 #endif
